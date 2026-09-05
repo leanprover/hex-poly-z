@@ -169,6 +169,57 @@ by index would drop those allocations and the `O(n log n)` element
 copying, which is the largest remaining cost in the kernel (50 µs of
 149 µs at degree 90).
 
+## Multipoint Kronecker and CRT-NTT
+
+The fast-arithmetic stage specified by
+[hex-poly-fast](../../SPEC/Libraries/hex-poly-fast.md) extends this owner rather
+than moving integer packing into the generic library. Existing
+`mulKronecker`, `mulKroneckerAt`, and their agreement theorems remain
+compatible.
+
+The new forced kernels are KS2 (evaluation at `B` and `-B`), KS3 (forward and
+reciprocal/reversed packing), and KS4 (their combination). They use two or
+four shorter GMP multiplications and prove signed recovery at every slot.
+Runtime bounds use the product of the two operands' separate maximum absolute
+coefficients and the maximum number of contributing terms. The production
+dispatcher measures KS1/KS2/KS3/KS4 across degree, operand ratio, coefficient
+width, and the GMP Karatsuba/Toom/FFT regimes; it does not assume that the
+variant with the most evaluation points wins everywhere.
+
+For larger products, `mulNttCrt?` transforms the integer coefficients modulo
+the fixed auxiliary primes owned by hex-mod-arith and reconstructs them with
+the balanced batch CRT owned by hex-modular. With `k = min p.size q.size`,
+`A = maxAbs p`, and `C = maxAbs q`, it accumulates primes until their product
+`P` satisfies `2 * k * A * C < P`. This strict bound makes symmetric CRT
+reconstruction equal to each true signed coefficient. The operation returns
+`none` if the fixed catalogue cannot cover the transform length or bound.
+
+`ZPoly.mulFast` is total and dispatches among schoolbook and
+KS1/KS2/KS3/KS4. CRT-NTT remains a forced, proved kernel, but the current
+measured table contains no winning CRT cell: balanced 64-bit coefficients keep
+KS1 roughly an order of magnitude ahead through 16384 coefficients per
+operand, while wider coefficient products exhaust the current seven-prime
+catalogue. The explicit `useCrtNtt` table is therefore empty rather than
+sending production calls down an unmeasured slower path. Every forced kernel
+and the dispatcher are proved equal to `DensePoly.mul`.
+
+The committed comparison uses three cold outer trials on `chungus2` (AMD EPYC
+9455), Lean `4.34.0-rc2`:
+
+| coefficients per operand | KS1 median | CRT-NTT median |
+|---:|---:|---:|
+| 4096 | 8.697 ms | 95.680 ms |
+| 8192 | 18.290 ms | 196.697 ms |
+| 16384 | 36.558 ms | 415.974 ms |
+
+Regenerate it with `lake exe hexpolyz_bench compare Hex.PolyZBench.runMulKS1Checksum Hex.PolyZBench.runMulCrtNttChecksum --param-floor 4096 --param-ceiling 16384 --param-schedule doubling --cache-mode cold --outer-trials 3 --signal-floor-multiplier 1`. The resulting `ZPoly` multiplication plan can drive generic product trees
+and clipped products; no new `Mul ZPoly` instance is introduced.
+
+This stage adds dependencies on hex-poly-fast, hex-mod-arith, and hex-modular
+only after those libraries are active. Its conformance extends the current
+signed Kronecker fixtures, and its benchmark extends the current two-
+dimensional grid rather than replacing it with asymptotic-only cases.
+
 ## External comparators
 
 | Comparator | Class | Scope |
@@ -176,8 +227,9 @@ copying, which is the largest remaining cost in the kernel (50 µs of
 | FLINT `fmpz_poly` via python-flint | informational | bench targets exercising arithmetic on `ZPoly` (the integer-polynomial surface inherited from `HexPoly`) |
 
 Same comparator and rationale as `hex-poly` (informational because
-of FLINT's tuned Karatsuba/Toom-Cook/FFT crossovers vs Hex's
-schoolbook-plus-Kronecker implementation). The Mignotte / Hensel-lift
+FLINT and Hex have independently tuned schoolbook/Kronecker/transform
+dispatchers, so one global ratio cannot gate every input cell). The Mignotte /
+Hensel-lift
 data surfaces specific to `hex-poly-z` have no direct FLINT
 analog at the same level of abstraction; those bench targets
 declare absence with the `no-comparable-surface-in-named-comparator`
