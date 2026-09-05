@@ -7,10 +7,10 @@
       "type": "git",
       "subDir": null,
       "scope": "",
-      "rev": "0ec35366ca67d3f4d1189cc4c9714805c5c437ec",
+      "rev": "da8a864cd17ccca780d8c76af403e88585bc4734",
       "name": "HexBasic",
       "manifestFile": "lake-manifest.json",
-      "inputRev": "0ec35366ca67d3f4d1189cc4c9714805c5c437ec",
+      "inputRev": "da8a864cd17ccca780d8c76af403e88585bc4734",
       "inherited": false,
       "configFile": "lakefile.toml"
     },
@@ -37,6 +37,18 @@
       "inputRev": "bf67a5243d68c909bcd059a89fd9d3f1c54ba7d8",
       "inherited": false,
       "configFile": "lakefile.toml"
+    },
+    {
+      "url": "https://github.com/leanprover/hex-mod-arith.git",
+      "type": "git",
+      "subDir": null,
+      "scope": "",
+      "rev": "67c1559800bc1f62622165d3fe5d6d346661539d",
+      "name": "HexModArith",
+      "manifestFile": "lake-manifest.json",
+      "inputRev": "67c1559800bc1f62622165d3fe5d6d346661539d",
+      "inherited": false,
+      "configFile": "lakefile.lean"
     }
   ],
   "name": "\u00abhex-poly-z\u00bb",
